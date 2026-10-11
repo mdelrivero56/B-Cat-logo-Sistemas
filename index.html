@@ -316,8 +316,8 @@ main{flex:1;width:100%;max-width:1100px;margin:0 auto;padding:0 var(--gutter) 72
 .steps li::before{counter-increment:p;content:counter(p);width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:14px}
 .steps li:last-child{border-bottom:0}
 .usedby{display:flex;gap:18px;align-items:stretch;min-width:0}
-.usedby .big{flex:none;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:0;min-width:84px}
-.usedby .big b{font-size:62px;line-height:1;font-weight:700;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.usedby .big{flex:none;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:2px;min-width:96px;padding:6px 10px 6px 8px;overflow:visible}
+.usedby .big b{display:block;font-size:58px;line-height:1.2;padding-top:2px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow:visible}
 .usedby .big span{color:var(--label-2);font-size:14px}
 .revs{display:grid;grid-auto-flow:column;grid-auto-columns:min(78%,320px);gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;flex:1;min-width:0;padding-block:2px 6px}
 .revs::-webkit-scrollbar{display:none}
@@ -1218,6 +1218,7 @@ const enviarCodigoSuper = (pend, codigo) => enviarAvisoCorreo(CORREO_SUPER, `Aut
   "Instrucciones": "Si autorizas esta cuenta, comparte el código con la persona. Si no la reconoces, ignora este correo."
 });
 async function solicitarSuper() {
+  if (S.cat.usuarios.length) { S.authView = "login"; render(false); return; }
   const nombre = val("a-nombre"), correo = normCorreo(val("a-correo")), p1 = $("#a-pass").value, p2 = $("#a-pass2").value;
   authErr("");
   if (nombre.length < 3) return authErr("Escribe tu nombre completo.");
@@ -1251,6 +1252,7 @@ async function reenviarCodigoSuper() {
   pendSuper.guardar(pend); toast("Enviamos un código nuevo al propietario.");
 }
 async function verificarCodigoSuper() {
+  if (S.cat.usuarios.length) { pendSuper.guardar(null); S.authView = "login"; render(false); return; }
   const pend = pendSuper.leer(), cod = normCodigo(val("a-codigo"));
   authErr("");
   if (!pend) { S.authView = "super"; render(false); return; }
@@ -1313,8 +1315,11 @@ function vAuth() {
   if (SB_ON) return vAuthSB();
   const c = cfg(), forzar = !!(S.user && S.user.debeCambiar), hay = S.cat.usuarios.length > 0;
   let v = S.authView;
-  if (!hay && (v === "login" || v === "registro" || v === "recuperar")) v = "super";
-  if (v === "codigo" && !pendSuper.leer()) v = hay ? "login" : "super";
+  /* La creación de Superadministrador NO se ofrece al público: solo existe para la instalación inicial (sin cuentas) y únicamente por el enlace privado #/acceso/propietario. */
+  const enlacePropietario = !hay && /^#\/acceso\/propietario/.test(location.hash);
+  if (enlacePropietario && v === "login") v = "super";
+  if (v === "super" && !enlacePropietario) v = "login";
+  if (v === "codigo" && (!pendSuper.leer() || !enlacePropietario)) v = "login";
   const logo = logoInner(c);
   const fld = (id, label, o = {}) => `<div class="field"><label for="${id}">${label}</label>${o.pw
     ? `<div class="pwrow"><input id="${id}" type="password" autocomplete="${o.auto || "current-password"}"><button type="button" class="showpw" data-act="ver-pass" aria-label="Mostrar u ocultar contraseña">Mostrar</button></div>`
@@ -1325,7 +1330,7 @@ function vAuth() {
   const ayudaRoles = `<details class="auth-alt"><summary class="muted" style="cursor:pointer;font-size:14px">¿Qué tipo de acceso necesito?</summary><ul class="rolhelp">
     <li><b>Visualizador:</b> solo consulta el catálogo, sin cuenta. No puede solicitar.</li><li><b>Usuario:</b> con su cuenta, consulta y solicita sistemas.</li>
     <li><b>Colaborador:</b> ayuda a manejar el catálogo (sistemas y categorías). Lo autoriza el administrador.</li>
-    <li><b>Superadministrador:</b> control total (usuarios, configuración y publicación). Requiere un código de autorización.</li></ul></details>`;
+    <li><b>Superadministrador:</b> control total. No se solicita aquí: solo lo asigna el propietario del sistema.</li></ul></details>`;
   let t, sub, body;
   if (forzar) {
     t = "Crea tu nueva contraseña"; sub = "Tu contraseña actual es temporal. Elige una nueva para continuar.";
@@ -1347,10 +1352,10 @@ function vAuth() {
       <div class="note info" style="margin-top:12px">${glifo("info")}<div>Si no llega en un par de minutos, revisa spam. La primera vez, el servicio de correo (FormSubmit) pide al propietario confirmar su correo.</div></div>
       <div class="auth-links"><button type="button" data-act="super-reenviar">Reenviar código</button><button type="button" data-act="super-cancelar">Cancelar solicitud</button></div>`;
   } else if (v === "registro") {
-    t = "Solicitar acceso como colaborador"; sub = "Un colaborador ayuda a manejar el catálogo (sistemas y categorías). Llena tus datos: la solicitud llega al administrador, quien te asignará una contraseña temporal.";
+    t = "Solicitar acceso"; sub = "Llena tus datos: la solicitud llega al administrador, quien te creará una cuenta de usuario con una contraseña temporal. Si necesitas otro tipo de acceso, indícalo con él.";
     body = `<form id="form-reg" novalidate>${fld("a-nombre", "Nombre completo", { auto: "name" })}${fld("a-dep", "Dependencia u organización")}${fld("a-cargo", "Cargo")}${fld("a-correo", "Correo institucional", { tipo: "email", auto: "email", ph: "nombre@dependencia.gob.mx" })}${fld("a-tel", "Teléfono", { tipo: "tel", auto: "tel" })}
       <label class="chk"><input type="checkbox" id="a-acepto"><span>${esc(c.privacidad)}</span></label>${err}<button class="btn big" type="submit">Enviar solicitud</button></form>
-      <div class="auth-links"><button type="button" data-act="auth-ir" data-v="login">Ya tengo usuario</button><button type="button" data-act="auth-ir" data-v="super">Necesito acceso de Superadministrador</button></div>`;
+      <div class="auth-links"><button type="button" data-act="auth-ir" data-v="login">Ya tengo usuario</button></div>`;
   } else if (v === "recuperar") {
     t = "Recuperar contraseña"; sub = "Escribe el correo con el que te registraste. El administrador te enviará una contraseña temporal.";
     body = `<form id="form-rec" novalidate>${correoF("Correo registrado")}${err}<button class="btn big" type="submit">Solicitar recuperación</button></form>
@@ -1370,10 +1375,11 @@ function vAuth() {
       <div class="auth-links"><button type="button" data-act="auth-ir" data-v="login">Volver a iniciar sesión</button></div>`;
   } else {
     t = "Iniciar sesión"; sub = "Entra con tu correo y tu contraseña, o explora el catálogo como visitante.";
+    if (!hay) sub = "Aún no hay cuentas guardadas en este navegador. Si ya tienes cuenta, abre el catálogo desde el mismo enlace o dispositivo donde se creó, o explora como visitante.";
     body = `<form id="form-login" novalidate>${correoF()}${fld("a-pass", "Contraseña", { pw: 1 })}
       <label class="chk"><input type="checkbox" id="a-rec"><span>Mantener la sesión en este dispositivo</span></label>${err}<button class="btn big" type="submit">Iniciar sesión</button></form>
       ${visitante}
-      <div class="auth-links"><button type="button" data-act="auth-ir" data-v="recuperar">¿Olvidaste tu contraseña?</button><button type="button" data-act="auth-ir" data-v="registro">Quiero ser colaborador</button><button type="button" data-act="auth-ir" data-v="super">Superadministrador</button></div>${ayudaRoles}`;
+      <div class="auth-links"><button type="button" data-act="auth-ir" data-v="recuperar">¿Olvidaste tu contraseña?</button><button type="button" data-act="auth-ir" data-v="registro">Solicitar acceso</button></div>${ayudaRoles}`;
   }
   return `<div class="authwrap"><div class="authcard"><div class="auth-brand"><span class="auth-logo${imgOk(c.logo) ? "" : " lg"}">${logo}</span><div><b>${esc(c.nombre)}</b><small>${esc(c.organizacion)}</small></div></div><h1>${t}</h1><p class="lede">${sub}</p>${body}</div><p class="auth-foot">${esc(c.organizacion)}</p></div>`;
 }
@@ -2403,7 +2409,7 @@ async function subirImagenRapida(kind, id, f) {
 const QA_MANUAL = [
   ["q1", "Entrar como visitante: ver el catálogo, buscar y solicitar un sistema"],
   ["q2", "El visitante no puede abrir Administración"],
-  ["q3", "Pedir acceso de Superadministrador: llega el correo con el código (fuera del modo pruebas)"],
+  ["q3", "Solicitar acceso: la solicitud llega al administrador (fuera del modo pruebas)"],
   ["q4", "Un código incorrecto o vencido es rechazado"],
   ["q5", "Crear un colaborador, entrar con su contraseña temporal y cambiarla"],
   ["q6", "El colaborador edita sistemas y categorías, pero no ve Usuarios ni Configuración"],
