@@ -666,6 +666,34 @@ button.avatar{font:inherit;font-weight:700}
 .cfg .up label.btn:hover{background:#e0f0f2!important}
 @media(max-width:520px){.authcard{padding:26px 19px 22px!important;border-radius:22px!important}.auth-brand{gap:10px}.auth-logo{width:48px!important;height:48px!important}.authcard h1{font-size:24px!important}.auth-tabs button{font-size:13px;padding:9px 7px}}
 
+
+
+/* Ajuste visual Diseño B: encabezado superior limpio, con contraste y jerarquía */
+.navbar{
+  background:linear-gradient(115deg,#f7faff 0%,#edf4fb 100%);
+  border-bottom:1px solid #d8e4f0;
+  color:#18324b;
+}
+.navbar.scrolled{
+  background:rgba(248,251,255,.94);
+  border-bottom-color:#d4e1ee;
+  box-shadow:0 4px 18px rgba(24,50,75,.07);
+}
+.pagehead .when{color:#52677c}
+.pagehead .large-title::before{
+  background:linear-gradient(90deg,#1d5f91,#58a6a6);
+}
+.navbar .circ{
+  background:#fff;
+  color:#205b85;
+  box-shadow:0 0 0 1px #d7e3ef,0 2px 7px rgba(24,50,75,.07);
+}
+@media (prefers-color-scheme: dark){
+  .navbar{background:linear-gradient(115deg,#172638 0%,#1c344a 100%);border-bottom-color:#30485d;color:#f2f7fb}
+  .navbar.scrolled{background:rgba(23,38,56,.95);border-bottom-color:#30485d}
+  .pagehead .when{color:#c1d0dd}
+  .navbar .circ{background:#23394d;color:#d9ecfb;box-shadow:0 0 0 1px #3a5369}
+}
 </style>
 </head>
 <body>
@@ -793,7 +821,7 @@ const URL_RECUP = SB_ON && /[#&?]type=recovery/.test(location.hash + location.se
 const URL_ERR = SB_ON && /[#&?](error_code|error_description)=/.test(location.hash + location.search);
 const ARCHIVO_PUBLICADO = "catalogo.json";   // catálogo compartido con todos los visitantes
 const LIMITE_ARCHIVO = 10 * 1024 * 1024;      // 10 MB por adjunto
-const CORREO_SUPER = "mdelrivero56@gmail.com";  // único correo autorizado para Superadministrador
+const CORREO_SUPER = "delrivero25@gmail.com";  // único correo autorizado para Superadministrador
 const ROLES = { visitante: "Usuario", gestor: "Colaborador", superadmin: "Superadministrador" };
 const rolDe = (r) => (r === "admin" ? "superadmin" : r === "usuario" ? "visitante" : ROLES[r] ? r : "visitante");
 
@@ -1418,7 +1446,7 @@ async function iniciarSesion() {
 function authTabs(a) {
   const correoActual = normCorreo(document.getElementById("a-correo")?.value || "");
   const flujoSuper = ["super", "codigo", "supercod"].includes(S.authView);
-  const mostrarSuper = correoActual === "mdelrivero56@gmail.com" || flujoSuper;
+  const mostrarSuper = correoActual === "delrivero25@gmail.com" || flujoSuper;
   return `<div class="auth-tabs" role="tablist" aria-label="Tipo de acceso"><button type="button" role="tab" aria-selected="${a === "usuario"}" data-act="auth-ir" data-v="login">Usuario</button><button id="tab-superadmin" type="button" role="tab" aria-selected="${a === "super"}" data-act="auth-ir" data-v="super" ${mostrarSuper ? "" : "hidden"}>Superadministrador</button></div>`;
 }
 function marcarFaltantes(lista) {
@@ -1434,7 +1462,7 @@ document.addEventListener("input", (e) => { const w = e.target.closest && e.targ
 document.addEventListener("input", (e) => {
   if (!e.target || e.target.id !== "a-correo") return;
   const tab = document.getElementById("tab-superadmin");
-  if (tab) tab.hidden = normCorreo(e.target.value) !== "mdelrivero56@gmail.com";
+  if (tab) tab.hidden = normCorreo(e.target.value) !== "delrivero25@gmail.com";
 });
 function depCampoAuth() {
   const L = depsNombres(), hay = L.length > 0;
@@ -1468,15 +1496,29 @@ async function enviarAvisoCorreo(para, asunto, campos) {
   if (!correoOk(para)) return false;
   if (S.qa) { S.qaLog.unshift({ fecha: new Date().toLocaleString("es-MX"), para, asunto, campos }); return true; }
   try {
-    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);
-    const r = await fetch("https://formsubmit.co/ajax/" + para.trim(), {
-      method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, signal: ctl.signal,
-      body: JSON.stringify(Object.assign({ _subject: asunto, _template: "table", _captcha: "false" }, campos))
-    });
-    clearTimeout(tm);
-    const j = await r.json().catch(() => ({}));
-    return r.ok && String(j.success) !== "false";
-  } catch (e) { return false; }
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 20000);
+    try {
+      const datos = Object.assign({
+        _subject: asunto,
+        _template: "table",
+        _captcha: "false",
+        _replyto: campos["Correo"] || campos["Correo electrónico"] || ""
+      }, campos);
+      const r = await fetch("https://formsubmit.co/ajax/" + encodeURIComponent(para.trim()), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        signal: ctl.signal,
+        body: JSON.stringify(datos)
+      });
+      const j = await r.json().catch(() => ({}));
+      return r.ok && (j.success === true || String(j.success).toLowerCase() === "true");
+    } finally {
+      clearTimeout(tm);
+    }
+  } catch (e) {
+    console.error("FormSubmit: no se pudo enviar el correo", e);
+    return false;
+  }
 }
 const enviarCodigoSuper = (pend, codigo) => enviarAvisoCorreo(CORREO_SUPER, `Autorización de Superadministrador · ${pend.nombre}`, {
   "Nombre": pend.nombre, "Usuario": pend.correo, "Tipo de cuenta": "Superadministrador",
@@ -1488,7 +1530,7 @@ async function solicitarSuper() {
   authErr("");
   if (nombre.length < 3) return authErr("Escribe tu nombre completo.");
   if (!correoOk(correo)) return authErr("Escribe un correo válido.");
-  if (correo !== "mdelrivero56@gmail.com") return authErr("El acceso de Superadministrador está reservado al correo autorizado.");
+  if (correo !== "delrivero25@gmail.com") return authErr("El acceso de Superadministrador está reservado al correo autorizado.");
   if (!claveOk(p1)) return authErr(CLAVE_AYUDA);
   if (normCorreo(p1) === correo) return authErr("La contraseña no puede ser tu correo.");
   if (p1 !== p2) return authErr("Las contraseñas no coinciden.");
@@ -2971,7 +3013,7 @@ const ACT = {
   async "dep-import"() { for (const d of depsResumen().sin) await depsRegistrar(d.nombre); toast("Dependencias registradas"); keep(() => render(false)); },
   "auth-ir"(t) {
     const destino = t.dataset.v;
-    if (destino === "super" && normCorreo($("#a-correo")?.value || "") !== "mdelrivero56@gmail.com" && !["super", "codigo", "supercod"].includes(S.authView)) {
+    if (destino === "super" && normCorreo($("#a-correo")?.value || "") !== "delrivero25@gmail.com" && !["super", "codigo", "supercod"].includes(S.authView)) {
       toast("El acceso de Superadministrador está reservado al correo autorizado."); return;
     }
     S.authView = destino; render(false); const i = $("input", view); if (i) i.focus();
